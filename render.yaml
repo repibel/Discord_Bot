@@ -1,10 +1,9 @@
-# render.yaml
 services:
-  - type: web             # 웹 서비스로 배포
-    name: discord-music-bot  # 렌더 대시보드에 보일 이름
-    env: python           # Python 런타임 (Poetry 모드 해제)
-    plan: free            # 무료 플랜
-    region: oregon        # 원하는 리전(예: oregon, frankfurt)
+  - type: web
+    name: discord-music-bot
+    env: python
+    plan: free
+    region: oregon
     buildCommand: |
       pip install -U pip
       pip install -r requirements.txt
