@@ -1,0 +1,12 @@
+# render.yaml
+services:
+  - type: web
+    name: discord-music-bot        # Render에서 보일 서비스 이름
+    env: python
+    plan: free                      # 무료 플랜
+    region: oregon                  # (원하시는 지역으로)
+    buildCommand: >
+      pip uninstall -y discord discord.py &&
+      pip install -U pip &&
+      pip install -r requirements.txt
+    startCommand: python music_bot_full.py
