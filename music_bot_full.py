@@ -1,15 +1,12 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
-import yt_dlp
-import asyncio
+from discord import app_commands
 import os
-import pkg_resources
 
-print("=== 설치된 디스코드 패키지:", pkg_resources.get_distribution("discord").version)
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix="/", intents=intents)
+tree = bot.tree
 
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
 
 ALLOWED_CHANNEL_ID = 123456789012345678  # 여기에 허용된 텍스트 채널 ID 입력
 music_queue = []
