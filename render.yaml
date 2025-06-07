@@ -1,14 +1,16 @@
-# render.yaml
 services:
   - type: web
     name: discord-music-bot
-    env: python
+    env: python               # Poetry 모드 끄기 위해 반드시 python 으로 설정
     plan: free
-    region: oregon
-
+    region: oregon            # 원하시는 리전으로 바꾸셔도 됩니다
     buildCommand: |
+      # 최신 pip 설치
       pip install -U pip
+      # 프로젝트의 의존성 설치
       pip install -r requirements.txt
-
+      # Linux 용 libopus 바이너리 다운로드 (예시 URL이니, 실제 호스팅 경로로 교체)
+      curl -L https://your-host.com/libopus.so -o libopus.so
     startCommand: |
+      # 엔트리 스크립트 실행
       python bot_local.py
