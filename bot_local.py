@@ -1,6 +1,6 @@
 # bot_local.py
-# 로컬 실행용 Discord 뮤직 봇 (discord.py 및 yt-dlp 사용)
-# 최적화: 다운로드 대신 스트리밍으로 재생 속도 개선
+# 로컬 및 Render 배포용 Discord 뮤직 봇 (discord.py 및 yt-dlp 사용)
+# 최적화: 스트리밍으로 재생 속도 개선 + 헬스체크 HTTP 서버 추가
 
 import os
 import platform
@@ -8,18 +8,21 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import asyncio
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ----------------------------
 # opus 라이브러리 로드
 # ----------------------------
 if platform.system() == "Windows":
-    # 프로젝트 루트에 libopus-0.dll 파일을 두세요
     dll_path = os.path.join(os.path.dirname(__file__), "libopus-0.dll")
     discord.opus.load_opus(dll_path)
-# Linux/Mac 등의 시스템에서는 이미 설치된 libopus를 자동으로 사용하므로 별도 호출 불필요
+else:
+    # Linux/Mac 에서는 시스템에 설치된 libopus 사용
+    discord.opus.load_opus(discord.opus._default_opus_name())
 
 # ----------------------------
-# 봇 설정
+# Discord 봇 설정
 # ----------------------------
 intents = discord.Intents.default()
 intents.voice_states = True
@@ -33,13 +36,11 @@ queue = []
 def check_channel(interaction: discord.Interaction) -> bool:
     return interaction.channel.id == enabled_channel_id
 
-# 봇 준비 완료 시
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     print(f"✅ {bot.user} 로 로그인했습니다.")
 
-# 음성 채널 사용자가 모두 나가면 봇도 나감
 @bot.event
 async def on_voice_state_update(member, before, after):
     global enabled_channel_id
@@ -111,9 +112,8 @@ async def play(
         'noplaylist': True,
         'default_search': 'auto'
     }
-    # 다운로드 없이 스트림 URL 추출
-    import yt_dlp as _yt_dlp
-    with _yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    import yt_dlp
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
         if 'entries' in info:
             info = info['entries'][0]
@@ -127,7 +127,8 @@ async def play(
     else:
         await interaction.followup.send(f"➕ 대기열 추가: **{title}**")
 
-# /stop 명령
+# 기타 명령어 (stop, pause, resume, leave, queue)… 동일 패턴으로 정의
+
 @tree.command(name="stop", description="⏹️ 재생 중지 및 대기열 초기화")
 async def stop(interaction: discord.Interaction):
     if not check_channel(interaction):
@@ -141,7 +142,6 @@ async def stop(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ 음성 채널에 연결되어 있지 않습니다.")
 
-# /pause 명령
 @tree.command(name="pause", description="⏸️ 일시정지")
 async def pause(interaction: discord.Interaction):
     if not check_channel(interaction):
@@ -154,7 +154,6 @@ async def pause(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ 재생 중인 음악이 없습니다.")
 
-# /resume 명령
 @tree.command(name="resume", description="▶️ 일시정지된 음악 재생")
 async def resume(interaction: discord.Interaction):
     if not check_channel(interaction):
@@ -167,7 +166,6 @@ async def resume(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ 일시정지된 음악이 없습니다.")
 
-# /leave 명령
 @tree.command(name="leave", description="🚪 음성 채널에서 나가기")
 async def leave(interaction: discord.Interaction):
     global enabled_channel_id
@@ -182,7 +180,6 @@ async def leave(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ 음성 채널에 연결되어 있지 않습니다.")
 
-# /queue 명령
 @tree.command(name="queue", description="📃 대기열 표시")
 async def show_queue(interaction: discord.Interaction):
     if not check_channel(interaction):
@@ -195,6 +192,20 @@ async def show_queue(interaction: discord.Interaction):
         await interaction.response.send_message("📭 대기열이 비어 있습니다.")
 
 # ----------------------------
+# 헬스체크 HTTP 서버 (Render 웹 서비스용)
+# ----------------------------
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+
+def start_health_server():
+    port = int(os.environ.get("PORT", 8080))
+    HTTPServer(("0.0.0.0", port), HealthHandler).serve_forever()
+
+# ----------------------------
 # 실행
 # ----------------------------
 if __name__ == "__main__":
@@ -202,5 +213,8 @@ if __name__ == "__main__":
     if not token:
         print("오류: BOT_TOKEN 환경 변수가 설정되지 않았습니다.")
     else:
+        # 헬스체크 서버 시작 (웹 서비스일 때만 필요)
+        Thread(target=start_health_server, daemon=True).start()
         bot.run(token)
+
 
