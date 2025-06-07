@@ -216,5 +216,3 @@ if __name__ == "__main__":
         # 헬스체크 서버 시작 (웹 서비스일 때만 필요)
         Thread(target=start_health_server, daemon=True).start()
         bot.run(token)
-
-
