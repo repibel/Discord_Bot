@@ -5,11 +5,9 @@ services:
     plan: free
     region: oregon
     buildCommand: |
-      # 1) 시스템 패키지로 Opus 라이브러리와 ffmpeg 설치
+      # 1) 시스템 패키지로 Opus 코덱과 ffmpeg 설치
       apt-get update && apt-get install -y libopus0 ffmpeg
-      # 2) pip 최신화
-      pip install -U pip
-      # 3) Python 의존성 설치
-      pip install -r requirements.txt
+      # 2) pip 최신화 & 의존성 설치
+      pip install -U pip && pip install -r requirements.txt
     startCommand: |
       python bot_local.py
