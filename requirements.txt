@@ -1,13 +1,2 @@
-# render.yaml
-services:
-  - type: web
-    name: discord-music-bot
-    env: python                 # 여기가 핵심! python env로 지정하면 Poetry 모드 OFF
-    plan: free
-    region: oregon
-    buildCommand: |
-      pip uninstall -y discord discord.py
-      pip install -U pip
-      pip install -r requirements.txt
-    startCommand: |
-      python music_bot_full.py
+py-cord==2.4.1
+yt-dlp
