@@ -1,10 +1,12 @@
-
 import discord
 from discord import app_commands
 from discord.ext import commands
 import yt_dlp
 import asyncio
 import os
+import pkg_resources
+
+print("=== 설치된 디스코드 패키지:", pkg_resources.get_distribution("discord").version)
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -24,7 +26,7 @@ def check_channel(interaction: discord.Interaction):
 
 async def play_next(interaction: discord.Interaction):
     if not music_queue:
-        await interaction.channel.send("✅ 대기열에 남은 곡이 없습니다.")
+        await interaction.channel.send("✅ 대기여에 남은 곡이 없습니다.")
         return
 
     title, filename = music_queue.pop(0)
@@ -35,7 +37,7 @@ async def play_next(interaction: discord.Interaction):
         coro = play_next(interaction)
         asyncio.run_coroutine_threadsafe(coro, bot.loop)
         if not music_queue:
-            asyncio.run_coroutine_threadsafe(interaction.channel.send("✅ 대기열이 비었습니다."), bot.loop)
+            asyncio.run_coroutine_threadsafe(interaction.channel.send("✅ 대기여이 비어있습니다."), bot.loop)
         else:
             next_title = music_queue[0][0]
             asyncio.run_coroutine_threadsafe(interaction.channel.send(f"▶️ 다음 곡: **{next_title}**"), bot.loop)
@@ -83,7 +85,7 @@ async def play(interaction: discord.Interaction, url: str):
     if not interaction.guild.voice_client.is_playing():
         await play_next(interaction)
     else:
-        await interaction.followup.send(f"🎶 **{title}** 이(가) 대기열에 추가되었어요!")
+        await interaction.followup.send(f"🎶 **{title}** 이(가) 대기여에 추가되었어요!")
 
 @bot.tree.command(name="search", description="🔍 유튜브에서 키워드로 음악을 검색합니다.")
 @app_commands.describe(query="검색 키워드")
@@ -107,12 +109,11 @@ async def search(interaction: discord.Interaction, query: str):
     view = discord.ui.View(timeout=30)
     for i, entry in enumerate(entries):
         title = entry['title']
-        url = entry['webpage_url']
 
         async def callback(interaction_button, entry=entry):
             await interaction_button.response.defer()
             if interaction.user.voice is None or interaction.user.voice.channel is None:
-                await interaction_button.followup.send("⚠️ 먼저 음성 채널에 들어가 있어야 해요!", ephemeral=True)
+                await interaction_button.followup.send("⚠️ 먼저 음성 채널에 들어가야 해요!", ephemeral=True)
                 return
 
             voice_channel = interaction.user.voice.channel
@@ -142,13 +143,13 @@ async def search(interaction: discord.Interaction, query: str):
             if not interaction.guild.voice_client.is_playing():
                 await play_next(interaction)
             else:
-                await interaction_button.followup.send(f"🎶 **{title}** 이(가) 대기열에 추가되었어요!")
+                await interaction_button.followup.send(f"🎶 **{title}** 이(가) 대기여에 추가되었어요!")
 
         button = discord.ui.Button(label=title[:80], style=discord.ButtonStyle.primary)
         button.callback = callback
         view.add_item(button)
 
-    await interaction.followup.send("🔍 검색 결과 중 하나를 선택하세요:", view=view)
+    await interaction.followup.send("🔍 검색 결과 중 하나를 선택해주세요:", view=view)
 
 @bot.tree.command(name="pause", description="⏸️ 음악을 일시정지합니다.")
 async def pause(interaction: discord.Interaction):
@@ -186,9 +187,9 @@ async def stop(interaction: discord.Interaction):
         interaction.guild.voice_client.stop()
         await interaction.response.send_message("⏹️ 음악 정지 완료!")
     else:
-        await interaction.response.send_message("❌ 봇이 음성 채널에 있지 않아요.")
+        await interaction.response.send_message("❌ 보건 음성 채널에 없습니다.")
 
-@bot.tree.command(name="leave", description="🚪 봇이 음성 채널에서 나갑니다.")
+@bot.tree.command(name="leave", description="🚪 바이츠가 음성 채널에서 나갈까요.")
 async def leave(interaction: discord.Interaction):
     if not check_channel(interaction):
         await interaction.response.send_message("❌ 이 채널에서는 명령어를 사용할 수 없습니다.", ephemeral=True)
@@ -196,9 +197,9 @@ async def leave(interaction: discord.Interaction):
 
     if interaction.guild.voice_client is not None:
         await interaction.guild.voice_client.disconnect()
-        await interaction.response.send_message("👋 음성 채널에서 나갔어요!")
+        await interaction.response.send_message("👋 음성 채널에서 나가요!")
     else:
-        await interaction.response.send_message("❌ 봇이 음성 채널에 없어요.")
+        await interaction.response.send_message("❌ 보건 음성 채널에 없습니다.")
 
 @bot.tree.command(name="queue", description="📃 현재 대기 중인 음악 목록을 확인합니다.")
 async def queue(interaction: discord.Interaction):
@@ -208,9 +209,9 @@ async def queue(interaction: discord.Interaction):
 
     if music_queue:
         msg = "\n".join([f"{idx+1}. {title}" for idx, (title, _) in enumerate(music_queue)])
-        await interaction.response.send_message(f"📃 대기열:\n{msg}")
+        await interaction.response.send_message(f"📃 대기여:\n{msg}")
     else:
-        await interaction.response.send_message("📭 대기열이 비어 있어요.")
+        await interaction.response.send_message("📫 대기여가 비어 있어요.")
 
-# 여기에 디스코드 봇 토큰 입력
-bot.run("MTM4MDg4MjQwNjU4MzcwMTYzNQ.GO-XFl.UWTapQQC5b5gS99TZc29c-lerWlReiAv-vVCwM")
+# 현개 Render에서 BOT_TOKEN 환경변수를 통해 버전을 활성화
+bot.run(os.getenv("BOT_TOKEN"))
