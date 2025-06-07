@@ -1,2 +1,3 @@
+-e pip uninstall discord -y
 py-cord==2.4.1
 yt-dlp
