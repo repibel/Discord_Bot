@@ -1,2 +1,3 @@
-py-cord==2.4.1
-yt-dlp
+discord.py[voice]==2.5.2
+yt-dlp==2025.5.22
+audioop_lts==0.2.1
