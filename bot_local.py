@@ -16,9 +16,7 @@ if platform.system() == "Windows":
     # 프로젝트 루트에 libopus-0.dll 파일을 두세요
     dll_path = os.path.join(os.path.dirname(__file__), "libopus-0.dll")
     discord.opus.load_opus(dll_path)
-else:
-    # Linux/Mac 에서는 시스템에 설치된 libopus 사용
-    discord.opus.load_opus()
+# Linux/Mac 등의 시스템에서는 이미 설치된 libopus를 자동으로 사용하므로 별도 호출 불필요
 
 # ----------------------------
 # 봇 설정
@@ -205,3 +203,4 @@ if __name__ == "__main__":
         print("오류: BOT_TOKEN 환경 변수가 설정되지 않았습니다.")
     else:
         bot.run(token)
+
