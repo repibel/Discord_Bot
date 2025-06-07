@@ -1,45 +1,18 @@
 # bot_local.py
-# 로컬·Render 양쪽에서 동작하는 Discord 뮤직 봇
-# discord.py(2.5.2), yt-dlp 사용, 스트리밍 재생
+# 로컬·Render 공용 Discord 뮤직 봇 (discord.py + yt-dlp)
+# 최적화: 다운로드 대신 스트리밍으로 재생 속도 개선
 
 import os
-import platform
 import discord
 from discord.ext import commands
 from discord import app_commands
-import asyncio
 import yt_dlp
+import asyncio
 
-# ----------------------------
-# OPUS 라이브러리 로드
-# ----------------------------
-def load_opus_lib():
-    system = platform.system()
-    if system == "Windows":
-        # 프로젝트 루트에 libopus-0.dll 파일을 두세요
-        dll_path = os.path.join(os.path.dirname(__file__), "libopus-0.dll")
-        try:
-            discord.opus.load_opus(dll_path)
-            print(f"✅ Windows OPUS 로드 성공: {dll_path}")
-        except OSError as e:
-            print(f"❌ Windows OPUS 로드 실패: {e}")
-    else:
-        # Linux/Mac 용: 가능한 이름들을 순서대로 시도
-        for name in ("libopus.so.0", "libopus.so", "opus"):
-            try:
-                discord.opus.load_opus(name)
-                print(f"✅ POSIX OPUS 로드 성공: {name}")
-                return
-            except OSError:
-                continue
-        print("⚠️ OPUS 라이브러리 로드 실패—음성 기능이 제한됩니다.")
-
-load_opus_lib()
-
-# ----------------------------
-# 봇 설정
-# ----------------------------
+# —————————————————————————————————————————————————————————
+# 인텐트 설정: 슬래시 커맨드와 음성 상태 변화를 위해 guilds, voice_states 활성화
 intents = discord.Intents.default()
+intents.guilds = True
 intents.voice_states = True
 
 bot = commands.Bot(command_prefix="/", intents=intents)
@@ -48,14 +21,18 @@ tree = bot.tree
 enabled_channel_id = None
 queue = []
 
+# —————————————————————————————————————————————————————————
+# 채널 사용 체크
 def check_channel(interaction: discord.Interaction) -> bool:
     return interaction.channel.id == enabled_channel_id
 
+# 봇 준비 완료 시
 @bot.event
 async def on_ready():
     await tree.sync()
     print(f"✅ {bot.user} 로 로그인했습니다.")
 
+# 음성 채널이 비었으면 봇도 나가기
 @bot.event
 async def on_voice_state_update(member, before, after):
     global enabled_channel_id
@@ -65,9 +42,10 @@ async def on_voice_state_update(member, before, after):
         if not non_bots:
             await vc.disconnect()
             enabled_channel_id = None
-            print("👋 음성 채널이 비어 있어 봇이 나갔습니다.")
+            print("👋 음성 채널이 비어 봇이 나갔습니다.")
 
-# 다음 곡 재생
+# —————————————————————————————————————————————————————————
+# 다음 곡 재생 (스트리밍)
 async def _play_next(interaction: discord.Interaction):
     if not queue:
         await interaction.channel.send("✅ 대기열이 비어 있습니다.")
@@ -96,7 +74,8 @@ async def _play_next(interaction: discord.Interaction):
     vc.play(source, after=after_playing)
     await interaction.channel.send(f"🎶 재생 중: **{title}**")
 
-# /play
+# —————————————————————————————————————————————————————————
+# /play 슬래시커맨드: 스트리밍으로 YouTube 음악 재생
 @tree.command(name="play", description="🎵 스트리밍으로 YouTube 음악 재생")
 @app_commands.describe(url="YouTube URL")
 async def play(interaction: discord.Interaction, url: str):
@@ -104,13 +83,21 @@ async def play(interaction: discord.Interaction, url: str):
     enabled_channel_id = interaction.channel.id
 
     if not check_channel(interaction):
-        await interaction.response.send_message("❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True)
-        return
+        return await interaction.response.send_message(
+            "❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True
+        )
 
-    await interaction.response.defer()
+    # defer() 에서 NotFound 무시
+    try:
+        await interaction.response.defer()
+    except discord.NotFound:
+        pass
+
+    # 음성채널 미접속 시
     if not interaction.user.voice or not interaction.user.voice.channel:
-        await interaction.followup.send("⚠️ 먼저 음성 채널에 들어가주세요!")
-        return
+        return await interaction.followup.send(
+            "⚠️ 먼저 음성 채널에 들어가주세요!", ephemeral=True
+        )
 
     channel = interaction.user.voice.channel
     if not interaction.guild.voice_client:
@@ -118,11 +105,11 @@ async def play(interaction: discord.Interaction, url: str):
     else:
         await interaction.guild.voice_client.move_to(channel)
 
+    # yt-dlp 로 스트림 URL 뽑아오기
     ydl_opts = {
         'format': 'bestaudio/best',
         'quiet': True,
-        'noplaylist': True,
-        'default_search': 'auto',
+        'noplaylist': True
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -136,82 +123,95 @@ async def play(interaction: discord.Interaction, url: str):
     if not vc.is_playing():
         await _play_next(interaction)
     else:
-        await interaction.followup.send(f"➕ 대기열에 추가: **{title}**")
+        await interaction.followup.send(f"➕ 대기열 추가: **{title}**")
 
-# /stop
+# —————————————————————————————————————————————————————————
+# /stop: 재생 중지 및 대기열 초기화
 @tree.command(name="stop", description="⏹️ 재생 중지 및 대기열 초기화")
 async def stop(interaction: discord.Interaction):
     if not check_channel(interaction):
-        await interaction.response.send_message("❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True)
-        return
+        return await interaction.response.send_message(
+            "❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True
+        )
     vc = interaction.guild.voice_client
     if vc:
         vc.stop()
         queue.clear()
-        await interaction.response.send_message("⏹️ 재생을 중지하고 대기열을 초기화했습니다.")
+        await interaction.response.send_message(
+            "⏹️ 재생을 중지하고 대기열을 초기화했습니다."
+        )
     else:
-        await interaction.response.send_message("❌ 음성 채널에 연결되어 있지 않습니다.")
+        await interaction.response.send_message(
+            "❌ 음성 채널에 연결되어 있지 않습니다."
+        )
 
-# /pause
+# /pause: 일시정지
 @tree.command(name="pause", description="⏸️ 일시정지")
 async def pause(interaction: discord.Interaction):
     if not check_channel(interaction):
-        await interaction.response.send_message("❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True)
-        return
+        return await interaction.response.send_message(
+            "❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True
+        )
     vc = interaction.guild.voice_client
     if vc and vc.is_playing():
         vc.pause()
         await interaction.response.send_message("⏸️ 일시정지되었습니다.")
     else:
-        await interaction.response.send_message("❌ 재생 중인 음악이 없습니다.")
+        await interaction.response.send_message(
+            "❌ 재생 중인 음악이 없습니다."
+        )
 
-# /resume
+# /resume: 일시정지된 음악 재생
 @tree.command(name="resume", description="▶️ 일시정지된 음악 재생")
 async def resume(interaction: discord.Interaction):
     if not check_channel(interaction):
-        await interaction.response.send_message("❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True)
-        return
+        return await interaction.response.send_message(
+            "❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True
+        )
     vc = interaction.guild.voice_client
     if vc and vc.is_paused():
         vc.resume()
         await interaction.response.send_message("▶️ 재생을 다시 시작했습니다.")
     else:
-        await interaction.response.send_message("❌ 일시정지된 음악이 없습니다.")
+        await interaction.response.send_message(
+            "❌ 일시정지된 음악이 없습니다."
+        )
 
-# /leave
+# /leave: 음성 채널에서 나가기
 @tree.command(name="leave", description="🚪 음성 채널에서 나가기")
 async def leave(interaction: discord.Interaction):
     global enabled_channel_id
     if not check_channel(interaction):
-        await interaction.response.send_message("❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True)
-        return
+        return await interaction.response.send_message(
+            "❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True
+        )
     vc = interaction.guild.voice_client
     if vc:
         await vc.disconnect()
         enabled_channel_id = None
         await interaction.response.send_message("👋 음성 채널에서 나갔습니다.")
     else:
-        await interaction.response.send_message("❌ 음성 채널에 연결되어 있지 않습니다.")
+        await interaction.response.send_message(
+            "❌ 음성 채널에 연결되어 있지 않습니다."
+        )
 
-# /queue
+# /queue: 대기열 표시
 @tree.command(name="queue", description="📃 대기열 표시")
 async def show_queue(interaction: discord.Interaction):
     if not check_channel(interaction):
-        await interaction.response.send_message("❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True)
-        return
+        return await interaction.response.send_message(
+            "❌ 이 채널에서 사용할 수 없습니다.", ephemeral=True
+        )
     if queue:
         msg = "\n".join(f"{i+1}. {t}" for i, (t, _) in enumerate(queue))
         await interaction.response.send_message(f"📃 대기열:\n{msg}")
     else:
         await interaction.response.send_message("📭 대기열이 비어 있습니다.")
 
-# ----------------------------
-# 실행
-# ----------------------------
+# —————————————————————————————————————————————————————————
 if __name__ == "__main__":
     token = os.getenv("BOT_TOKEN")
     if not token:
         print("오류: BOT_TOKEN 환경 변수가 설정되지 않았습니다.")
     else:
         bot.run(token)
-
