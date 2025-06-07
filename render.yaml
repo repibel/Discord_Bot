@@ -1,16 +1,5 @@
-# render.yaml  
-services:
-  - type: web
-    name: discord-music-bot       # 렌더 대시보드에 보이는 서비스 이름
-    env: python                   # ★ 이걸로 poetry 모드를 꺼버립니다
-    plan: free
-    region: oregon                # 원하시는 리전에 맞춰 바꿔도 됩니다
-    buildCommand: |
-      # 이전 discord.py 제거
-      pip uninstall -y discord discord.py
-      # 최신 pip
-      pip install -U pip
-      # requirements.txt 기반으로 설치
-      pip install -r requirements.txt
-    startCommand: |
-      python music_bot_full.py
+env: python
+buildCommand: |
+  pip uninstall -y discord discord.py
+  pip install -U pip
+  pip install -r requirements.txt
