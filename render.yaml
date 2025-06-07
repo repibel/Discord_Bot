@@ -4,8 +4,10 @@ services:
     env: python
     plan: free
     region: oregon
+
     buildCommand: |
       pip install -U pip
       pip install -r requirements.txt
+
     startCommand: |
       python bot_local.py
